@@ -39,9 +39,7 @@ func (c *LruCache[K, V]) Get(key K) (V, error) {
 		if curElement, present := c.elementMap[key]; present {
 			lruEntry := (curElement.Value).(LruEntry[K])
 			if lruEntry.insertionTime.Add(time.Millisecond * time.Duration(c.ttlInMillis)).Before(time.Now()) {
-				c.keyOrder.Remove(curElement)
-				(*c.cacheStore).Remove(key)
-				delete(c.elementMap, key)
+				c.removeKey(curElement, key)
 				return val, fmt.Errorf("TTL expired for key %v", key)
 			}
 			c.keyOrder.MoveToBack(curElement)
@@ -66,10 +64,8 @@ func (c *LruCache[K, V]) Put(key K, value V) {
 
 func (c *LruCache[K, V]) Evict() {
 	lruKey := c.keyOrder.Front()
-	c.keyOrder.Remove(lruKey)
 	lruEntry := (lruKey.Value).(LruEntry[K])
-	(*c.cacheStore).Remove(lruEntry.key)
-	delete(c.elementMap, lruEntry.key)
+	c.removeKey(lruKey, lruEntry.key)
 }
 
 func (c *LruCache[K, V]) RemoveExpiredEntries() {
@@ -78,10 +74,14 @@ func (c *LruCache[K, V]) RemoveExpiredEntries() {
 		expiredEntries := atomic.Int32{}
 		for key, element := range c.elementMap {
 			expiredEntries.Add(1)
-			c.keyOrder.Remove(element)
-			(*c.cacheStore).Remove(key)
-			delete(c.elementMap, key)
+			c.removeKey(element, key)
 		}
 		fmt.Printf("Successfully removed %d expired entries\n", expiredEntries.Load())
 	}
+}
+
+func (c *LruCache[K, V]) removeKey(element *list.Element, key K) {
+	c.keyOrder.Remove(element)
+	(*c.cacheStore).Remove(key)
+	delete(c.elementMap, key)
 }
