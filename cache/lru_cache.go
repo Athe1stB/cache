@@ -4,6 +4,7 @@ import (
 	"athe1stb/cache/store"
 	"container/list"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,15 +19,17 @@ type LruCache[K comparable, V any] struct {
 	cacheStore  *store.CacheStore[K, V]
 	keyOrder    *list.List
 	elementMap  map[K]*list.Element
+	ticker      *time.Ticker
 }
 
 func NewLruCache[K comparable, V any](capacity int, ttlInMillis int, cs store.CacheStore[K, V]) *LruCache[K, V] {
 	return &LruCache[K, V]{
-		capacity:   capacity,
-		cacheStore: &cs,
+		capacity:    capacity,
+		cacheStore:  &cs,
 		ttlInMillis: ttlInMillis,
-		keyOrder:   list.New(),
-		elementMap: make(map[K]*list.Element),
+		keyOrder:    list.New(),
+		elementMap:  make(map[K]*list.Element),
+		ticker:      time.NewTicker(time.Second * 15),
 	}
 }
 
@@ -70,9 +73,15 @@ func (c *LruCache[K, V]) Evict() {
 }
 
 func (c *LruCache[K, V]) RemoveExpiredEntries() {
-	for key, element := range(c.elementMap) {
-		c.keyOrder.Remove(element)
-		(*c.cacheStore).Remove(key)
-		delete(c.elementMap, key)
+	for range c.ticker.C {
+		fmt.Println("Starting to remove expired entries")
+		expiredEntries := atomic.Int32{}
+		for key, element := range c.elementMap {
+			expiredEntries.Add(1)
+			c.keyOrder.Remove(element)
+			(*c.cacheStore).Remove(key)
+			delete(c.elementMap, key)
+		}
+		fmt.Printf("Successfully removed %d expired entries\n", expiredEntries.Load())
 	}
 }
