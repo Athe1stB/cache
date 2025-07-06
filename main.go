@@ -4,17 +4,19 @@ import (
 	"athe1stb/cache/cache"
 	"athe1stb/cache/store"
 	"fmt"
+	"time"
 )
 
 func main() {
 	var store store.CacheStore[int, int] = store.NewInMemoryStore[int, int]()
-	cache := cache.NewLruCache(2, store)
+	cache := cache.NewLruCache(2, 1000, store)
 
 	printValue(cache, 5)
 	cache.Put(3, 5)
 	cache.Put(1, 1)
 	printValue(cache, 3)
 	cache.Put(2, 2)
+	time.Sleep(time.Second * 1)
 	printValue(cache, 1)
 	printValue(cache, 2)
 	printValue(cache, 3)
